@@ -106,7 +106,7 @@ WHERE ad_spend = '';
 ```
 The cleaning process helped prepare the dataset for further analysis.
 
-#3. Exploratory Data Analysis
+# 3. Exploratory Data Analysis
 
 After cleaning the data, SQL aggregation functions were used to understand the overall characteristics of the dataset.
 
@@ -137,7 +137,7 @@ Example:
 SELECT SUM(monthly_sales) AS total_sales
 FROM retail_sale2;
 ```
-#4. Store Performance Analysis
+# 4. Store Performance Analysis
 
 Store-level performance was analyzed using GROUP BY, aggregation functions, and sorting.
 
@@ -174,7 +174,7 @@ GROUP BY store_id
 ORDER BY sales_per_employee DESC
 LIMIT 10;
 ```
-#5. Time-Based Analysis
+# 5. Time-Based Analysis
 
 Sales performance was analyzed across different years and months.
 
@@ -209,7 +209,7 @@ FROM retail_sale2
 GROUP BY year, month
 ORDER BY year, month;
 ```
-#SQL Concepts Practiced
+# SQL Concepts Practiced
 
 This project helped me practice the following SQL concepts:
 
