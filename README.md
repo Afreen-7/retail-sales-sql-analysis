@@ -18,7 +18,9 @@ The analysis started with basic SQL concepts and has progressively expanded into
 * Common Table Expressions (CTEs)
 * Window functions
 * `RANK()`
+* `LAG()`
 * `PARTITION BY`
+* Month-over-month sales analysis
 
 The analysis focuses on store performance, sales trends, foot traffic, advertising spend, returns, pricing, staffing, store size, and yearly/monthly sales patterns.
 
@@ -34,7 +36,7 @@ The dataset contains monthly information for different retail stores.
 
 ### Main Columns
 
-| Column                   | Description                                    |
+| **Column**               | **Description**                                |
 | ------------------------ | ---------------------------------------------- |
 | `store_id`               | Unique identifier for each store               |
 | `year`                   | Year of the record                             |
@@ -62,6 +64,7 @@ The dataset contains monthly information for different retail stores.
 * MySQL
 * MySQL Workbench
 * SQL
+* GitHub
 
 ---
 
@@ -79,6 +82,7 @@ The project is being completed progressively through the following stages:
 8. Subquery analysis
 9. Common Table Expressions (CTEs)
 10. Window functions and ranking
+11. `LAG()` and month-over-month sales analysis
 
 ---
 
@@ -593,6 +597,259 @@ Return the top records from each group
 
 ---
 
+# 11. LAG() and Month-over-Month Sales Analysis
+
+The project was further extended by learning `LAG()`, another important SQL window function.
+
+`LAG()` allows the current row to be compared with a previous row without requiring a self-join.
+
+For this project, `LAG()` was used to compare monthly sales for each store.
+
+## Previous Month's Sales
+
+The previous month's sales were calculated separately for each store.
+
+```sql
+SELECT
+    store_id,
+    year,
+    month,
+    monthly_sales,
+    LAG(monthly_sales) OVER (
+        PARTITION BY store_id
+        ORDER BY year, month
+    ) AS previous_month_sales
+FROM retail_sale2;
+```
+
+Here:
+
+* `LAG()` looks at the previous row
+* `PARTITION BY store_id` resets the calculation for each store
+* `ORDER BY year, month` keeps the records in chronological order
+
+The first month of each store has no previous month, so `LAG()` returns `NULL`.
+
+---
+
+## Sales Change Compared with Previous Month
+
+A CTE was used to first calculate the previous month's sales and then calculate the difference.
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+)
+SELECT
+    store_id,
+    month,
+    year,
+    monthly_sales,
+    previous_month_sale,
+    monthly_sales - previous_month_sale AS sales_change
+FROM sale_data;
+```
+
+This shows whether sales increased or decreased compared with the previous month.
+
+---
+
+## Records Where Sales Increased
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+)
+SELECT
+    store_id,
+    month,
+    monthly_sales,
+    previous_month_sale
+FROM sale_data
+WHERE monthly_sales > previous_month_sale;
+```
+
+This identifies months where a store's sales were higher than the previous month.
+
+---
+
+## Records Where Sales Decreased
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+)
+SELECT
+    store_id,
+    month,
+    monthly_sales,
+    previous_month_sale
+FROM sale_data
+WHERE monthly_sales < previous_month_sale;
+```
+
+---
+
+## Percentage Change from Previous Month
+
+Month-over-month percentage change was calculated using:
+
+```text
+(Current Sales - Previous Sales) / Previous Sales × 100
+```
+
+SQL:
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+)
+SELECT
+    store_id,
+    month,
+    year,
+    monthly_sales,
+    previous_month_sale,
+    (monthly_sales - previous_month_sale)
+        / previous_month_sale * 100 AS percent_change
+FROM sale_data;
+```
+
+This makes it possible to measure the rate at which sales increased or decreased from one month to the next.
+
+---
+
+## Sales from Two Months Ago
+
+`LAG()` can also use an offset to look further back.
+
+The following query compares the current month's sales with sales from two months earlier:
+
+```sql
+SELECT
+    store_id,
+    year,
+    month,
+    monthly_sales,
+    LAG(monthly_sales, 2) OVER (
+        PARTITION BY store_id
+        ORDER BY year, month
+    ) AS sales_2_months_ago
+FROM retail_sale2;
+```
+
+The offset `2` tells `LAG()` to look two rows back within each store.
+
+---
+
+## Largest Monthly Sales Increase
+
+The change between the current month and previous month was calculated first, followed by `MAX()` to find the largest increase for each store.
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+),
+change_data AS (
+    SELECT
+        store_id,
+        month,
+        monthly_sales,
+        previous_month_sale,
+        monthly_sales - previous_month_sale AS sale_change
+    FROM sale_data
+)
+SELECT
+    store_id,
+    MAX(sale_change) AS largest_increase
+FROM change_data
+GROUP BY store_id;
+```
+
+---
+
+## Largest Monthly Sales Decrease
+
+Similarly, `MIN()` was used to identify the largest decrease for each store.
+
+```sql
+WITH sale_data AS (
+    SELECT
+        store_id,
+        month,
+        year,
+        monthly_sales,
+        LAG(monthly_sales) OVER (
+            PARTITION BY store_id
+            ORDER BY year, month
+        ) AS previous_month_sale
+    FROM retail_sale2
+),
+change_data AS (
+    SELECT
+        store_id,
+        month,
+        monthly_sales,
+        previous_month_sale,
+        monthly_sales - previous_month_sale AS sale_change
+    FROM sale_data
+)
+SELECT
+    store_id,
+    MIN(sale_change) AS largest_decrease
+FROM change_data
+GROUP BY store_id;
+```
+
+This stage helped me understand how `LAG()`, CTEs, and calculations can be combined to perform month-over-month business analysis.
+
+---
+
 # SQL Concepts Practiced
 
 ## Basic SQL
@@ -644,11 +901,15 @@ Return the top records from each group
 ## Window Functions
 
 * `RANK()`
+* `LAG()`
 * `OVER()`
 * `ORDER BY` within window functions
 * `PARTITION BY`
+* Window function offsets
 * Ranking within groups
 * Ranking aggregated results
+* Previous-row comparisons
+* Month-over-month analysis
 
 ---
 
@@ -673,6 +934,19 @@ Compared stores based on:
 ## Time Trends
 
 Analyzed sales patterns across years and months to understand changes in retail performance over time.
+
+## Month-over-Month Sales
+
+Used `LAG()` to analyze:
+
+* Previous month's sales
+* Sales increases
+* Sales decreases
+* Equal monthly sales
+* Percentage sales change
+* Sales from two months ago
+* Largest monthly sales increase
+* Largest monthly sales decrease
 
 ## Store Size and Sales
 
@@ -746,9 +1020,13 @@ So far, I have practiced:
 * Common Table Expressions
 * Window functions
 * `RANK()`
+* `LAG()`
 * `PARTITION BY`
+* Month-over-month sales analysis
 
 The project has helped me understand how SQL can be used to answer practical business questions rather than only performing basic data retrieval.
+
+Learning `LAG()` was an important step because it allowed me to compare a store's current performance with its previous performance and calculate meaningful month-over-month changes.
 
 I am continuing to expand the project as I learn more advanced SQL concepts.
 
@@ -759,14 +1037,24 @@ I am continuing to expand the project as I learn more advanced SQL concepts.
 Future versions of this project may include:
 
 * `JOIN` operations
-* `LAG()` and `LEAD()`
-* Previous-month sales comparisons
-* Monthly sales growth analysis
-* Rolling averages
+* `LEAD()`
 * `DENSE_RANK()`
 * `ROW_NUMBER()`
+* Consecutive month analysis
+* Monthly sales growth analysis
+* Rolling averages
 * More advanced window functions
 * Correlation analysis between advertising, promotions, foot traffic, and sales
 * More detailed business insights
 * Additional SQL optimization and analysis
 * Dashboard development using a BI tool
+
+---
+
+# Author
+
+**Afreen Tariq**
+
+BS Data Science
+
+Interested in **Data Analytics, SQL, Python, and Business Intelligence**.
